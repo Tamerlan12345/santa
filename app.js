@@ -30,6 +30,9 @@ class SecretSantaApp {
         await this.loadInitialData();
         this.setupEventListeners();
         this.setupRealtimeSubscription();
+
+        // НОВОЕ: Загружаем уведомления для главного экрана
+        await this.loadPublicNotifications();
     }
 
     // --- Инициализация и загрузка данных ---
@@ -126,6 +129,77 @@ class SecretSantaApp {
         }
     }
 
+    // --- НОВОЕ: Метод загрузки уведомлений ---
+    async loadPublicNotifications() {
+        const listContainer = document.getElementById('publicNotificationsList');
+        if (!listContainer) return;
+
+        // Забираем последние 15 сообщений
+        const { data: messages, error } = await supabase
+            .from('messages')
+            .select('receiver_id, created_at')
+            .order('created_at', { ascending: false })
+            .limit(15);
+
+        if (error) {
+            console.error('Ошибка загрузки уведомлений:', error);
+            listContainer.innerHTML = '<div style="text-align:center;">Тишина...</div>';
+            return;
+        }
+
+        this.renderNotificationsList(messages);
+    }
+
+    renderNotificationsList(messages) {
+        const listContainer = document.getElementById('publicNotificationsList');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = ''; // Clear it first
+
+        if (!messages || messages.length === 0) {
+            listContainer.innerHTML = '<div class="placeholder" style="text-align:center; color: #bdc3c7;">Пока сообщений нет ❄️</div>';
+            return;
+        }
+
+        messages.forEach(msg => {
+            this.renderSingleNotification(msg, false); // append
+        });
+    }
+
+    renderSingleNotification(msg, prepend = false) {
+        const listContainer = document.getElementById('publicNotificationsList');
+        if (!listContainer) return;
+
+        // Remove placeholder if it exists
+        const placeholder = listContainer.querySelector('.placeholder');
+        if (placeholder) {
+            placeholder.remove();
+        }
+
+        const recipient = this.users.find(u => u.id === msg.receiver_id);
+        const recipientName = recipient ? recipient.name : 'Участнику';
+
+        const date = new Date(msg.created_at);
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const div = document.createElement('div');
+        div.className = 'notif-item';
+        div.innerHTML = `
+            <span class="notif-time">${timeStr}</span>
+            <span class="notif-text"><b>${recipientName}</b>, вам написал Тайный Санта!</span>
+        `;
+
+        if (prepend) {
+            listContainer.prepend(div);
+        } else {
+            listContainer.appendChild(div);
+        }
+
+        // Enforce max of 15 items
+        while (listContainer.children.length > 15) {
+            listContainer.lastElementChild.remove();
+        }
+    }
     // --- Логика Администратора ---
 
     showAdminDashboard() {
@@ -473,10 +547,13 @@ class SecretSantaApp {
                 });
             })
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-                // Если открыт чат, обновляем
+                // 1. Если открыт личный чат - обновляем его
                 if (document.getElementById('chatScreen').classList.contains('active')) {
                     this.loadChatMessages();
                 }
+
+                // 2. Обновляем публичные уведомления
+                this.renderSingleNotification(payload.new, true);
             })
             .subscribe();
     }
