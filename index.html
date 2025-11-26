@@ -862,6 +862,47 @@
                 </tbody>
             </table>
         </div>
+
+        <div class="cards-grid" style="margin-top: 40px; max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <!-- Admin Wishlist Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">🎁</div>
+                    <div class="card-title">Мой Wishlist (Админ)</div>
+                </div>
+                <div class="card-content">
+                    <div class="form-group">
+                        <textarea id="adminWishlistInput" placeholder="Напишите ваши желания..."></textarea>
+                    </div>
+                    <button class="btn btn-secondary" id="saveAdminWishlistBtn">✓ Сохранить</button>
+                </div>
+            </div>
+
+            <!-- Admin's Recipient Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">🎅</div>
+                    <div class="card-title">Мой Подопечный (Админ)</div>
+                </div>
+                <div class="card-content">
+                    <div id="adminRecipientInfo" class="hidden">
+                        <h3>Вы дарите подарок:</h3>
+                        <div class="recipient-name" id="adminRecipientName"></div>
+                        <div class="recipient-wishlist">
+                            <h4>📋 Wishlist:</h4>
+                            <p id="adminRecipientWishlistText"></p>
+                        </div>
+                        <div class="chat-button" style="margin-top: 20px;">
+                           <button class="btn btn-primary" id="adminOpenChatBtn">💬 Открыть чат</button>
+                        </div>
+                    </div>
+                    <div id="adminRecipientWaiting" class="waiting-message">
+                        <div class="icon">⏰</div>
+                        <p>Жеребьевка еще не проведена.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- User Dashboard Screen -->
