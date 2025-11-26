@@ -132,6 +132,29 @@ class SecretSantaApp {
         this.showScreen('adminScreen');
         this.updateAdminTable();
         this.updateGameStatusUI();
+
+        // Admin's own wishlist
+        const adminUser = this.users.find(u => u.is_admin);
+        if (adminUser) {
+            document.getElementById('adminWishlistInput').value = adminUser.wishlist || '';
+        }
+
+        // Admin's recipient info
+        if (this.gameActive) {
+            const adminPair = this.pairs.find(p => p.santa_id === adminUser.id);
+            if (adminPair) {
+                const recipient = this.users.find(u => u.id === adminPair.receiver_id);
+                if (recipient) {
+                    document.getElementById('adminRecipientName').textContent = recipient.name;
+                    document.getElementById('adminRecipientWishlistText').textContent = recipient.wishlist || 'Не указано';
+                    document.getElementById('adminRecipientInfo').classList.remove('hidden');
+                    document.getElementById('adminRecipientWaiting').classList.add('hidden');
+                }
+            }
+        } else {
+            document.getElementById('adminRecipientInfo').classList.add('hidden');
+            document.getElementById('adminRecipientWaiting').classList.remove('hidden');
+        }
     }
 
     async updateAdminTable() {
@@ -237,6 +260,27 @@ class SecretSantaApp {
             .eq('key', 'game_active');
 
         this.showToast('Игра сброшена.');
+    }
+
+    async saveAdminWishlist() {
+        const text = document.getElementById('adminWishlistInput').value.trim();
+        const adminUser = this.users.find(u => u.is_admin);
+        if (!text || !adminUser) return;
+
+        const { error } = await supabase
+            .from('users')
+            .update({ wishlist: text })
+            .eq('id', adminUser.id);
+
+        if (!error) {
+            this.showToast('Wishlist администратора сохранен!');
+        }
+    }
+
+    openAdminChat() {
+        // This will just open the regular chat screen, but the logic inside
+        // loadChatMessages will handle using the admin's context.
+        this.openChat();
     }
 
     // --- Логика Пользователя ---
@@ -495,6 +539,27 @@ class SecretSantaApp {
             e.preventDefault();
             this.handleLogin();
         });
+
+        // --- Admin Actions ---
+        document.getElementById('drawButton').addEventListener('click', () => this.conductDraw());
+        document.getElementById('resetButton').addEventListener('click', () => this.resetDraw());
+        document.getElementById('adminLogoutBtn').addEventListener('click', () => this.logout());
+        document.getElementById('saveAdminWishlistBtn').addEventListener('click', () => this.saveAdminWishlist());
+        document.getElementById('adminOpenChatBtn').addEventListener('click', () => this.openAdminChat());
+
+        // --- User Actions ---
+        document.getElementById('saveWishlistBtn').addEventListener('click', () => this.saveWishlist());
+        document.getElementById('revealGiftBox').addEventListener('click', () => this.revealRecipient());
+        document.getElementById('openChatBtn').addEventListener('click', () => this.openChat());
+        document.getElementById('userLogoutBtn').addEventListener('click', () => this.logout());
+        document.getElementById('profileLogoutBtn').addEventListener('click', () => this.logout());
+
+        // --- Chat Actions ---
+        document.getElementById('backToDashboardBtn').addEventListener('click', () => this.backToUserDashboard());
+        document.getElementById('sendMessageBtn').addEventListener('click', () => this.sendMessage());
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.sendMessage();
+        });
     }
 
     backToUserDashboard() {
@@ -511,4 +576,19 @@ class SecretSantaApp {
 }
 
 // Запуск
-const app = new SecretSantaApp();
+try {
+  const app = new SecretSantaApp();
+  // Expose the app instance to the global scope for easier debugging and verification
+  window.app = app;
+} catch (error) {
+  console.error("A fatal error occurred during application startup:", error);
+  // Display a prominent error message to the user, as the app is unusable.
+  document.body.innerHTML = `
+    <div style="font-family: sans-serif; color: #fff; background-color: #1a1f3a; text-align: center; padding: 40px; height: 100vh;">
+      <h1>Application Error</h1>
+      <p>Sorry, the application could not be started due to a critical error.</p>
+      <p style="color: #e74c3c; font-weight: bold;">Please contact support and provide the error message below:</p>
+      <pre style="background-color: #0a0e27; padding: 15px; border-radius: 8px; text-align: left; color: #ecf0f1;">${error.stack || error.message}</pre>
+    </div>
+  `;
+}
