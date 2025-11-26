@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎄 Тайный Санта - СуперСемейка</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary-color: #e74c3c;
@@ -141,30 +142,30 @@
             border: 2px solid rgba(231, 76, 60, 0.3);
         }
 
-        #userGrid {
+        .user-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 15px;
-            margin-bottom: 25px;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+            max-height: 250px;
+            overflow-y: auto;
         }
 
         .user-btn {
-            padding: 15px 10px;
-            border-radius: 10px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-light);
-            font-size: 1em;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: white;
             cursor: pointer;
-            transition: all 0.3s ease;
             text-align: center;
+            transition: all 0.2s;
         }
 
         .user-btn.active,
         .user-btn:hover {
             background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
+            border-color: white;
             transform: scale(1.05);
         }
 
@@ -824,9 +825,7 @@
             <form id="loginForm">
                 <div class="form-group">
                     <label>👤 Выберите ваше имя</label>
-                    <div id="userGrid">
-                        <!-- User buttons will be injected here -->
-                    </div>
+                    <div id="userGrid" class="user-grid"></div>
                 </div>
                 <div class="form-group">
                     <label>🔒 Пароль</label>
@@ -839,14 +838,14 @@
 
     <!-- Admin Screen -->
     <div class="screen admin-screen" id="adminScreen">
-        <button class="logout-btn" onclick="app.logout()">🔓 Выход</button>
+        <button class="logout-btn" id="adminLogoutBtn">🔓 Выход</button>
         <div class="admin-header">
             <h1>🎅 Панель Администратора</h1>
             <div class="game-status waiting" id="gameStatusBadge">⏰ Ожидание</div>
         </div>
         <div class="admin-actions">
-            <button class="btn btn-primary" id="drawButton" onclick="app.conductDraw()">🎲 Провести жеребьевку</button>
-            <button class="btn btn-warning" id="resetButton" onclick="app.resetDraw()">🔄 Сброс</button>
+            <button class="btn btn-primary" id="drawButton">🎲 Провести жеребьевку</button>
+            <button class="btn btn-warning" id="resetButton">🔄 Сброс</button>
         </div>
         <div class="users-table-container">
             <table class="users-table">
@@ -867,7 +866,7 @@
 
     <!-- User Dashboard Screen -->
     <div class="screen user-screen" id="userScreen">
-        <button class="logout-btn" onclick="app.logout()">🔓 Выход</button>
+        <button class="logout-btn" id="userLogoutBtn">🔓 Выход</button>
         <div class="user-header">
             <h1 id="userGreeting">Привет! 🎄</h1>
         </div>
@@ -883,7 +882,7 @@
                         <label>Что я хочу получить?</label>
                         <textarea id="userWishlistInput" placeholder="Напишите ваши желания..."></textarea>
                     </div>
-                    <button class="btn btn-secondary" onclick="app.saveWishlist()">✓ Сохранить</button>
+                    <button class="btn btn-secondary" id="saveWishlistBtn">✓ Сохранить</button>
                     <div style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px;">
                         <strong>Ваш список:</strong>
                         <p id="savedWishlist" style="margin-top: 10px; color: var(--text-secondary);">Пусто</p>
@@ -905,7 +904,7 @@
                     </div>
                     <div id="recipientRevealed" class="hidden">
                         <div class="recipient-reveal">
-                            <div class="gift-box-3d small" id="revealGiftBox" onclick="app.revealRecipient()">
+                            <div class="gift-box-3d small" id="revealGiftBox">
                                 <div class="gift-face gift-front">🎁</div>
                                 <div class="gift-face gift-back">🎁</div>
                                 <div class="gift-face gift-right">🎁</div>
@@ -936,12 +935,12 @@
                 <div class="card-content">
                     <h2 id="profileName" style="color: var(--primary-color); margin-bottom: 20px;"></h2>
                     <div id="profileStatus" style="padding: 15px; border-radius: 10px; margin-bottom: 20px;"></div>
-                    <button class="btn btn-warning" onclick="app.logout()">🔓 Выход</button>
+                    <button class="btn btn-warning" id="profileLogoutBtn">🔓 Выход</button>
                 </div>
             </div>
         </div>
         <div class="chat-button" id="chatButtonContainer" style="display: none;">
-            <button class="btn btn-primary" onclick="app.openChat()">💬 Открыть чат</button>
+            <button class="btn btn-primary" id="openChatBtn">💬 Открыть чат</button>
         </div>
     </div>
 
@@ -949,7 +948,7 @@
     <div class="screen chat-screen" id="chatScreen">
         <div class="chat-header">
             <h2>💬 Тайный Чат</h2>
-            <button class="back-btn" onclick="app.backToUserDashboard()">← Назад</button>
+            <button class="back-btn" id="backToDashboardBtn">← Назад</button>
         </div>
         <div class="chat-messages" id="chatMessages">
             <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
@@ -959,7 +958,7 @@
         </div>
         <div class="chat-input-container">
             <input type="text" class="chat-input" id="chatInput" placeholder="Напишите сообщение...">
-            <button class="send-btn" onclick="app.sendMessage()">▶ Отправить</button>
+            <button class="send-btn" id="sendMessageBtn">▶ Отправить</button>
         </div>
     </div>
 
@@ -969,11 +968,11 @@
             <h2 id="modalTitle"></h2>
             <p id="modalMessage"></p>
             <div class="modal-actions">
-                <button class="btn btn-primary" onclick="app.closeModal()">OK</button>
+                <button class="btn btn-primary" id="modalCloseBtn">OK</button>
             </div>
         </div>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
