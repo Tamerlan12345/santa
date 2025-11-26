@@ -6,7 +6,7 @@ const supabaseUrl = 'https://amtmwdqroekyygpmlluw.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdG13ZHFyb2VreXlncG1sbHV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwNDA0OTIsImV4cCI6MjA3NTYxNjQ5Mn0.HrtBBzMrLtZBnzLeePpefvGYK7p0XZMusloKTz3EPw0';
 
 // Инициализация клиента
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // ==========================================
 // ОСНОВНОЙ КЛАСС ПРИЛОЖЕНИЯ
