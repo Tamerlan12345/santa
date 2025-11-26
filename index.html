@@ -141,6 +141,33 @@
             border: 2px solid rgba(231, 76, 60, 0.3);
         }
 
+        #userGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .user-btn {
+            padding: 15px 10px;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-light);
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .user-btn.active,
+        .user-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            transform: scale(1.05);
+        }
+
         .login-container h1 {
             text-align: center;
             margin-bottom: 30px;
@@ -797,9 +824,9 @@
             <form id="loginForm">
                 <div class="form-group">
                     <label>👤 Выберите ваше имя</label>
-                    <select id="userSelect">
-                        <option value="">-- Выберите --</option>
-                    </select>
+                    <div id="userGrid">
+                        <!-- User buttons will be injected here -->
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>🔒 Пароль</label>
@@ -947,6 +974,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>
