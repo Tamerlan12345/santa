@@ -1,35 +1,29 @@
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+// Supabase Connection
+const SUPABASE_URL = 'https://amtmwdqroekyygpmlluw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtdG13ZHFyb2VreXlncG1sbHV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwNDA0OTIsImV4cCI6MjA3NTYxNjQ5Mn0.HrtBBzMrLtZBnzLeePpefvGYK7p0XZMusloKTz3EPw0';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
 // Application State
 class SecretSantaApp {
     constructor() {
-        // Initialize users data
-        this.users = [
-            { id: 1, name: "Наталья", password: "admin123", is_admin: true, wishlist: "" },
-            { id: 2, name: "Наталия", password: "1234", is_admin: false, wishlist: "" },
-            { id: 3, name: "Евгений", password: "1234", is_admin: false, wishlist: "" },
-            { id: 4, name: "Андрей", password: "1234", is_admin: false, wishlist: "" },
-            { id: 5, name: "Светлана", password: "1234", is_admin: false, wishlist: "" },
-            { id: 6, name: "Эдуард", password: "1234", is_admin: false, wishlist: "" },
-            { id: 7, name: "Виталий", password: "1234", is_admin: false, wishlist: "" },
-            { id: 8, name: "Яна", password: "1234", is_admin: false, wishlist: "" },
-            { id: 9, name: "Тамерлан", password: "1234", is_admin: false, wishlist: "" },
-            { id: 10, name: "Ясмина", password: "1234", is_admin: false, wishlist: "" },
-            { id: 11, name: "Александра", password: "1234", is_admin: false, wishlist: "" },
-            { id: 12, name: "Галина", password: "1234", is_admin: false, wishlist: "" }
-        ];
-
+        this.users = []; // Will be fetched from Supabase
         this.currentUser = null;
+        this.selectedUserId = null; // New property to track selected user
         this.gameActive = false;
-        this.pairs = []; // { santa_id, receiver_id }
-        this.messages = []; // { id, sender_id, receiver_id, text, timestamp }
+        this.pairs = [];
+        this.messages = [];
         this.recipientRevealed = false;
 
         this.init();
     }
 
-    init() {
+    async init() {
         this.createSnowflakes();
-        this.populateUserSelect();
+        await this.populateUserGrid();
         this.setupEventListeners();
+        this.listenForGameChanges();
     }
 
     createSnowflakes() {
@@ -48,13 +42,41 @@ class SecretSantaApp {
         }
     }
 
-    populateUserSelect() {
-        const select = document.getElementById('userSelect');
+    async populateUserGrid() {
+        const grid = document.getElementById('userGrid');
+        grid.innerHTML = ''; // Clear existing grid
+
+        const { data, error } = await supabase.from('users').select('*').order('name');
+
+        if (error) {
+            console.error('Error fetching users:', error);
+            this.showToast('Ошибка загрузки пользователей');
+            return;
+        }
+
+        this.users = data; // Cache users locally
+
         this.users.forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.id;
-            option.textContent = user.name;
-            select.appendChild(option);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'user-btn';
+            button.textContent = user.name;
+            button.dataset.userId = user.id;
+
+            button.addEventListener('click', () => {
+                this.selectedUserId = user.id;
+
+                // Update visual state
+                document.querySelectorAll('.user-btn').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                // Focus password field
+                const passwordInput = document.getElementById('passwordInput');
+                passwordInput.value = '';
+                passwordInput.focus();
+            });
+
+            grid.appendChild(button);
         });
     }
 
@@ -73,18 +95,25 @@ class SecretSantaApp {
         });
     }
 
-    handleLogin() {
-        const userId = parseInt(document.getElementById('userSelect').value);
-        const password = document.getElementById('passwordInput').value;
-
-        if (!userId) {
+    async handleLogin() {
+        if (!this.selectedUserId) {
             this.showToast('Выберите ваше имя!');
             return;
         }
-
-        const user = this.users.find(u => u.id === userId);
         
-        if (!user) {
+        const password = document.getElementById('passwordInput').value;
+        if (!password) {
+            this.showToast('Введите пароль!');
+            return;
+        }
+
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', this.selectedUserId)
+            .single();
+
+        if (error || !user) {
             this.showToast('Пользователь не найден!');
             return;
         }
@@ -98,12 +127,43 @@ class SecretSantaApp {
         this.currentUser = user;
         this.showToast(`Добро пожаловать, ${user.name}!`);
 
-        // Navigate to appropriate screen
+        // Fetch game state and navigate
+        await this.fetchInitialData();
+
         if (user.is_admin) {
             this.showAdminDashboard();
         } else {
             this.showUserDashboard();
         }
+    }
+
+    async fetchInitialData() {
+        // Fetch game status
+        const { data: gameStatus, error: gameError } = await supabase
+            .from('game_settings')
+            .select('value')
+            .eq('key', 'game_active')
+            .single();
+
+        if (gameError) console.error('Error fetching game status:', gameError);
+        else this.gameActive = gameStatus.value === 'true';
+
+        // If game is active, fetch pairs
+        if (this.gameActive) {
+            const { data: pairs, error: pairsError } = await supabase
+                .from('pairs')
+                .select('*');
+
+            if (pairsError) console.error('Error fetching pairs:', pairsError);
+            else this.pairs = pairs;
+        } else {
+            this.pairs = [];
+        }
+
+        // Always fetch all users for admin table and recipient info
+        const { data: users, error: usersError } = await supabase.from('users').select('*');
+        if (usersError) console.error('Error fetching all users:', usersError);
+        else this.users = users;
     }
 
     showScreen(screenId) {
@@ -178,8 +238,7 @@ class SecretSantaApp {
         }
     }
 
-    conductDraw() {
-        // Check if all users have wishlists (optional, but good practice)
+    async conductDraw() {
         const usersWithoutWishlist = this.users.filter(u => !u.wishlist && !u.is_admin);
         if (usersWithoutWishlist.length > 0) {
             this.showModal(
@@ -189,24 +248,17 @@ class SecretSantaApp {
             );
             return;
         }
-
         this.performDraw();
     }
 
-    performDraw() {
-        // Fisher-Yates shuffle algorithm
+    async performDraw() {
         const userIds = this.users.map(u => u.id);
         let shuffled;
         let attempts = 0;
         const maxAttempts = 100;
 
-        // Keep shuffling until no one is their own Santa
         do {
-            shuffled = [...userIds];
-            for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-            }
+            shuffled = [...userIds].sort(() => Math.random() - 0.5);
             attempts++;
         } while (this.hasSelfAssignment(userIds, shuffled) && attempts < maxAttempts);
 
@@ -215,15 +267,32 @@ class SecretSantaApp {
             return;
         }
 
-        // Create pairs
-        this.pairs = [];
-        for (let i = 0; i < userIds.length; i++) {
-            this.pairs.push({
-                santa_id: userIds[i],
-                receiver_id: shuffled[i]
-            });
+        const newPairs = userIds.map((id, index) => ({
+            santa_id: id,
+            receiver_id: shuffled[index]
+        }));
+
+        // Insert new pairs
+        const { error: insertError } = await supabase.from('pairs').insert(newPairs);
+        if (insertError) {
+            this.showToast('Ошибка сохранения пар.');
+            console.error('Error inserting pairs:', insertError);
+            return;
         }
 
+        // Update game status
+        const { error: updateError } = await supabase
+            .from('game_settings')
+            .update({ value: 'true' })
+            .eq('key', 'game_active');
+
+        if (updateError) {
+            this.showToast('Ошибка обновления статуса игры.');
+            console.error('Error updating game status:', updateError);
+            return;
+        }
+
+        this.pairs = newPairs;
         this.gameActive = true;
         this.showToast('🎉 Жеребьевка проведена успешно!');
         this.updateAdminTable();
@@ -239,11 +308,39 @@ class SecretSantaApp {
         return false;
     }
 
-    resetDraw() {
+    async resetDraw() {
         this.showModal(
             '🔄 Подтверждение',
-            'Вы уверены, что хотите сбросить жеребьевку? Все пары будут удалены.',
-            () => {
+            'Вы уверены, что хотите сбросить жеребьевку? Все пары и сообщения будут удалены.',
+            async () => {
+                // Delete all pairs
+                const { error: pairsError } = await supabase.from('pairs').delete().gt('id', 0);
+                if (pairsError) {
+                    this.showToast('Ошибка удаления пар.');
+                    console.error('Error deleting pairs:', pairsError);
+                    return;
+                }
+
+                // Delete all messages
+                const { error: messagesError } = await supabase.from('messages').delete().gt('id', 0);
+                 if (messagesError) {
+                    this.showToast('Ошибка удаления сообщений.');
+                    console.error('Error deleting messages:', messagesError);
+                    return;
+                }
+
+                // Update game status
+                const { error: updateError } = await supabase
+                    .from('game_settings')
+                    .update({ value: 'false' })
+                    .eq('key', 'game_active');
+
+                if (updateError) {
+                    this.showToast('Ошибка обновления статуса.');
+                     console.error('Error updating game status:', updateError);
+                    return;
+                }
+
                 this.pairs = [];
                 this.gameActive = false;
                 this.messages = [];
@@ -295,7 +392,7 @@ class SecretSantaApp {
         }
     }
 
-    saveWishlist() {
+    async saveWishlist() {
         const wishlistText = document.getElementById('userWishlistInput').value.trim();
         
         if (!wishlistText) {
@@ -303,18 +400,27 @@ class SecretSantaApp {
             return;
         }
 
+        const { error } = await supabase
+            .from('users')
+            .update({ wishlist: wishlistText })
+            .eq('id', this.currentUser.id);
+
+        if (error) {
+            this.showToast('Ошибка сохранения. Попробуйте снова.');
+            console.error('Error saving wishlist:', error);
+            return;
+        }
+
         this.currentUser.wishlist = wishlistText;
         
-        // Update in users array
+        // Update local cache
         const userIndex = this.users.findIndex(u => u.id === this.currentUser.id);
-        if (userIndex !== -1) {
-            this.users[userIndex].wishlist = wishlistText;
-        }
+        if (userIndex !== -1) this.users[userIndex].wishlist = wishlistText;
 
         document.getElementById('savedWishlist').textContent = wishlistText;
         this.showToast('✓ Wishlist сохранен!');
         
-        // Update profile status
+        // Update profile status visually
         this.showUserDashboard();
     }
 
@@ -343,28 +449,36 @@ class SecretSantaApp {
         }, 500);
     }
 
-    openChat() {
+    async openChat() {
         this.showScreen('chatScreen');
-        this.loadChatMessages();
+        await this.loadChatMessages();
+        this.subscribeToChat();
     }
 
     backToUserDashboard() {
+        this.unsubscribeFromChat();
         this.showUserDashboard();
     }
 
-    loadChatMessages() {
+    async loadChatMessages() {
         const chatMessages = document.getElementById('chatMessages');
         const pair = this.pairs.find(p => p.santa_id === this.currentUser.id);
-        
         if (!pair) return;
 
-        // Get messages between current user and their recipient
-        const relevantMessages = this.messages.filter(m => 
-            (m.sender_id === this.currentUser.id && m.receiver_id === pair.receiver_id) ||
-            (m.sender_id === pair.receiver_id && m.receiver_id === this.currentUser.id)
-        );
+        const { data, error } = await supabase
+            .from('messages')
+            .select('*')
+            .or(`(sender_id.eq.${this.currentUser.id},receiver_id.eq.${pair.receiver_id}),(sender_id.eq.${pair.receiver_id},receiver_id.eq.${this.currentUser.id})`)
+            .order('created_at');
 
-        if (relevantMessages.length === 0) {
+        if (error) {
+            console.error('Error loading messages:', error);
+            return;
+        }
+
+        this.messages = data;
+
+        if (this.messages.length === 0) {
             chatMessages.innerHTML = `
                 <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
                     <p>Чат с вашим подопечным</p>
@@ -375,36 +489,13 @@ class SecretSantaApp {
         }
 
         chatMessages.innerHTML = '';
-        relevantMessages.forEach(msg => {
-            const isSent = msg.sender_id === this.currentUser.id;
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
-            
-            const senderName = isSent ? 'Вы' : 'Тайный Санта';
-            const time = new Date(msg.timestamp).toLocaleTimeString('ru-RU', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            });
-
-            messageDiv.innerHTML = `
-                <div class="message-sender">${senderName}</div>
-                <div class="message-bubble">
-                    ${msg.text}
-                    <div class="message-time">${time}</div>
-                </div>
-            `;
-            
-            chatMessages.appendChild(messageDiv);
-        });
-
-        // Scroll to bottom
+        this.messages.forEach(msg => this.renderMessage(msg));
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    sendMessage() {
+    async sendMessage() {
         const input = document.getElementById('chatInput');
         const text = input.value.trim();
-        
         if (!text) return;
 
         const pair = this.pairs.find(p => p.santa_id === this.currentUser.id);
@@ -414,25 +505,116 @@ class SecretSantaApp {
         }
 
         const message = {
-            id: this.messages.length + 1,
             sender_id: this.currentUser.id,
             receiver_id: pair.receiver_id,
             text: text,
-            timestamp: new Date().toISOString()
         };
 
-        this.messages.push(message);
+        const { error } = await supabase.from('messages').insert(message);
+
+        if (error) {
+            this.showToast('Ошибка отправки сообщения.');
+            console.error('Error sending message:', error);
+            return;
+        }
+
         input.value = '';
-        this.loadChatMessages();
+        // Realtime will handle rendering the new message
     }
 
     logout() {
         this.currentUser = null;
+        this.selectedUserId = null;
         this.recipientRevealed = false;
-        document.getElementById('userSelect').value = '';
+        this.unsubscribeFromChat(); // Ensure subscription is cleaned up
+
+        // Reset UI
+        document.querySelectorAll('.user-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById('passwordInput').value = '';
+
         this.showScreen('loginScreen');
         this.showToast('Вы вышли из системы');
+    }
+
+    renderMessage(msg) {
+        const chatMessages = document.getElementById('chatMessages');
+        // Clear initial message if it exists
+        if (chatMessages.querySelector('div[style*="text-align: center"]')) {
+            chatMessages.innerHTML = '';
+        }
+
+        const isSent = msg.sender_id === this.currentUser.id;
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+
+        const senderName = isSent ? 'Вы' : 'Тайный Санта';
+        const time = new Date(msg.created_at).toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        messageDiv.innerHTML = `
+            <div class="message-sender">${senderName}</div>
+            <div class="message-bubble">
+                ${msg.text}
+                <div class="message-time">${time}</div>
+            </div>
+        `;
+
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    subscribeToChat() {
+        if (this.chatSubscription) return; // Already subscribed
+
+        const pair = this.pairs.find(p => p.santa_id === this.currentUser.id);
+        if (!pair) return;
+
+        const channelId = `chat-${Math.min(this.currentUser.id, pair.receiver_id)}-${Math.max(this.currentUser.id, pair.receiver_id)}`;
+
+        this.chatSubscription = supabase
+            .channel(channelId)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+            }, payload => {
+                // Check if the message belongs to this chat
+                const msg = payload.new;
+                const isSender = msg.sender_id === this.currentUser.id && msg.receiver_id === pair.receiver_id;
+                const isReceiver = msg.receiver_id === this.currentUser.id && msg.sender_id === pair.receiver_id;
+
+                if (isSender || isReceiver) {
+                    this.renderMessage(msg);
+                }
+            })
+            .subscribe();
+    }
+
+    unsubscribeFromChat() {
+        if (this.chatSubscription) {
+            supabase.removeChannel(this.chatSubscription);
+            this.chatSubscription = null;
+        }
+    }
+
+    listenForGameChanges() {
+        this.gameSubscription = supabase
+            .channel('game-settings-changes')
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'game_settings',
+                filter: 'key=eq.game_active'
+            }, payload => {
+                const newStatus = payload.new.value === 'true';
+                if (this.gameActive !== newStatus) {
+                    this.showToast('Статус игры изменился! Перезагрузка...');
+                    setTimeout(() => window.location.reload(), 2000);
+                }
+            })
+            .subscribe();
     }
 
     showToast(message) {
@@ -478,17 +660,3 @@ class SecretSantaApp {
 
 // Initialize app
 const app = new SecretSantaApp();
-
-// Demo data for testing (optional)
-function addDemoWishlists() {
-    app.users[1].wishlist = "Книга по программированию, теплые носки, хороший чай";
-    app.users[2].wishlist = "Настольная игра, шоколад, билеты в кино";
-    app.users[3].wishlist = "Кружка с прикольным принтом, органайзер, растение";
-    app.showToast('Демо-данные добавлены!');
-    if (app.currentUser && app.currentUser.is_admin) {
-        app.updateAdminTable();
-    }
-}
-
-// Expose demo function for testing
-window.addDemoWishlists = addDemoWishlists;
