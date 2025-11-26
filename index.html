@@ -804,6 +804,62 @@
         @keyframes openLid {
             to { transform: rotateX(90deg) translateZ(75px) rotateX(-120deg); }
         }
+/* Добавить в секцию <style> */
+
+.notifications-panel {
+    margin-top: 25px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.notifications-panel h3 {
+    font-size: 1em;
+    color: var(--accent-color);
+    margin-bottom: 10px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.notifications-list {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* Стилизуем скроллбар */
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-color) transparent;
+}
+
+.notifications-list::-webkit-scrollbar {
+    width: 6px;
+}
+.notifications-list::-webkit-scrollbar-thumb {
+    background-color: var(--primary-color);
+    border-radius: 3px;
+}
+
+.notif-item {
+    font-size: 0.85em;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    border-left: 3px solid var(--secondary-color);
+    animation: fadeIn 0.5s ease;
+}
+
+.notif-time {
+    color: var(--text-secondary);
+    font-size: 0.8em;
+    margin-right: 5px;
+}
+
+.notif-text {
+    color: var(--text-light);
+}
     </style>
 </head>
 <body>
@@ -833,6 +889,13 @@
                 </div>
                 <button type="submit" class="btn btn-primary">🎅 Войти</button>
             </form>
+
+    <div class="notifications-panel">
+        <h3>🔔 Последние новости</h3>
+        <div id="publicNotificationsList" class="notifications-list">
+            <div style="text-align: center; color: #bdc3c7; font-size: 0.9em;">Загрузка...</div>
+        </div>
+    </div>
         </div>
     </div>
 
