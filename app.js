@@ -122,11 +122,7 @@ class SecretSantaApp {
             await this.fetchPairs();
         }
 
-        if (user.is_admin) {
-            this.showAdminDashboard();
-        } else {
-            this.showUserDashboard();
-        }
+        this.showUserDashboard();
     }
 
     // --- НОВОЕ: Метод загрузки уведомлений ---
@@ -362,6 +358,13 @@ class SecretSantaApp {
     showUserDashboard() {
         this.showScreen('userScreen');
         document.getElementById('userGreeting').textContent = `Привет, ${this.currentUser.name}! 🎄`;
+
+        const adminBtn = document.getElementById('adminDashboardBtn');
+        if (this.currentUser.is_admin) {
+            adminBtn.classList.remove('hidden');
+        } else {
+            adminBtn.classList.add('hidden');
+        }
         
         // Wishlist
         document.getElementById('userWishlistInput').value = this.currentUser.wishlist || '';
@@ -623,8 +626,10 @@ class SecretSantaApp {
         document.getElementById('adminLogoutBtn').addEventListener('click', () => this.logout());
         document.getElementById('saveAdminWishlistBtn').addEventListener('click', () => this.saveAdminWishlist());
         document.getElementById('adminOpenChatBtn').addEventListener('click', () => this.openAdminChat());
+        document.getElementById('backToUserScreenBtn').addEventListener('click', () => this.showUserDashboard());
 
         // --- User Actions ---
+        document.getElementById('adminDashboardBtn').addEventListener('click', () => this.showAdminDashboard());
         document.getElementById('saveWishlistBtn').addEventListener('click', () => this.saveWishlist());
         document.getElementById('revealGiftBox').addEventListener('click', () => this.revealRecipient());
         document.getElementById('openChatBtn').addEventListener('click', () => this.openChat());
