@@ -674,33 +674,42 @@ class SecretSantaApp {
         setTimeout(() => toast.remove(), 3000);
     }
 
+    addSafeEventListener(elementId, eventName, handler) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.addEventListener(eventName, handler);
+        } else {
+            console.warn(`Element with ID "${elementId}" not found. Skipping event listener for "${eventName}".`);
+        }
+    }
+
     setupEventListeners() {
-        document.getElementById('loginForm').addEventListener('submit', (e) => {
+        this.addSafeEventListener('loginForm', 'submit', (e) => {
             e.preventDefault();
             this.handleLogin();
         });
 
         // --- Admin Actions ---
-        document.getElementById('drawButton').addEventListener('click', () => this.conductDraw());
-        document.getElementById('resetButton').addEventListener('click', () => this.resetDraw());
-        document.getElementById('adminLogoutBtn').addEventListener('click', () => this.logout());
-        document.getElementById('saveAdminWishlistBtn').addEventListener('click', () => this.saveAdminWishlist());
-        document.getElementById('adminOpenChatBtn').addEventListener('click', () => this.openAdminChat());
-        document.getElementById('backToUserScreenBtn').addEventListener('click', () => this.showUserDashboard());
+        this.addSafeEventListener('drawButton', 'click', () => this.conductDraw());
+        this.addSafeEventListener('resetButton', 'click', () => this.resetDraw());
+        this.addSafeEventListener('adminLogoutBtn', 'click', () => this.logout());
+        this.addSafeEventListener('saveAdminWishlistBtn', 'click', () => this.saveAdminWishlist());
+        this.addSafeEventListener('adminOpenChatBtn', 'click', () => this.openAdminChat());
+        this.addSafeEventListener('backToUserScreenBtn', 'click', () => this.showUserDashboard());
 
         // --- User Actions ---
-        document.getElementById('adminDashboardBtn').addEventListener('click', () => this.showAdminDashboard());
-        document.getElementById('saveWishlistBtn').addEventListener('click', () => this.saveWishlist());
-        document.getElementById('revealGiftBox').addEventListener('click', () => this.revealRecipient());
-        document.getElementById('openRecipientChatBtn').addEventListener('click', () => this.openChat('recipient'));
-        document.getElementById('openSantaChatBtn').addEventListener('click', () => this.openChat('santa'));
-        document.getElementById('userLogoutBtn').addEventListener('click', () => this.logout());
-        document.getElementById('profileLogoutBtn').addEventListener('click', () => this.logout());
+        this.addSafeEventListener('adminDashboardBtn', 'click', () => this.showAdminDashboard());
+        this.addSafeEventListener('saveWishlistBtn', 'click', () => this.saveWishlist());
+        this.addSafeEventListener('revealGiftBox', 'click', () => this.revealRecipient());
+        this.addSafeEventListener('openRecipientChatBtn', 'click', () => this.openChat('recipient'));
+        this.addSafeEventListener('openSantaChatBtn', 'click', () => this.openChat('santa'));
+        this.addSafeEventListener('userLogoutBtn', 'click', () => this.logout());
+        this.addSafeEventListener('profileLogoutBtn', 'click', () => this.logout());
 
         // --- Chat Actions ---
-        document.getElementById('backToDashboardBtn').addEventListener('click', () => this.backToUserDashboard());
-        document.getElementById('sendMessageBtn').addEventListener('click', () => this.sendMessage());
-        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+        this.addSafeEventListener('backToDashboardBtn', 'click', () => this.backToUserDashboard());
+        this.addSafeEventListener('sendMessageBtn', 'click', () => this.sendMessage());
+        this.addSafeEventListener('chatInput', 'keypress', (e) => {
             if (e.key === 'Enter') this.sendMessage();
         });
     }
@@ -719,19 +728,21 @@ class SecretSantaApp {
 }
 
 // Запуск
-try {
-  const app = new SecretSantaApp();
-  // Expose the app instance to the global scope for easier debugging and verification
-  window.app = app;
-} catch (error) {
-  console.error("A fatal error occurred during application startup:", error);
-  // Display a prominent error message to the user, as the app is unusable.
-  document.body.innerHTML = `
-    <div style="font-family: sans-serif; color: #fff; background-color: #1a1f3a; text-align: center; padding: 40px; height: 100vh;">
-      <h1>Application Error</h1>
-      <p>Sorry, the application could not be started due to a critical error.</p>
-      <p style="color: #e74c3c; font-weight: bold;">Please contact support and provide the error message below:</p>
-      <pre style="background-color: #0a0e27; padding: 15px; border-radius: 8px; text-align: left; color: #ecf0f1;">${error.stack || error.message}</pre>
-    </div>
-  `;
-}
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const app = new SecretSantaApp();
+        // Expose the app instance to the global scope for easier debugging and verification
+        window.app = app;
+    } catch (error) {
+        console.error("A fatal error occurred during application startup:", error);
+        // Display a prominent error message to the user, as the app is unusable.
+        document.body.innerHTML = `
+            <div style="font-family: sans-serif; color: #fff; background-color: #1a1f3a; text-align: center; padding: 40px; height: 100vh;">
+            <h1>Application Error</h1>
+            <p>Sorry, the application could not be started due to a critical error.</p>
+            <p style="color: #e74c3c; font-weight: bold;">Please contact support and provide the error message below:</p>
+            <pre style="background-color: #0a0e27; padding: 15px; border-radius: 8px; text-align: left; color: #ecf0f1;">${error.stack || error.message}</pre>
+            </div>
+        `;
+    }
+});
