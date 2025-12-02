@@ -19,6 +19,8 @@ class SecretSantaApp {
         this.pairs = [];
         this.selectedUserId = null;
 
+        this.chatMode = 'recipient'; // 'recipient' (я дарю) или 'santa' (мне дарят)
+
         // Подписки на Realtime
         this.subscriptions = [];
 
@@ -348,9 +350,8 @@ class SecretSantaApp {
     }
 
     openAdminChat() {
-        // This will just open the regular chat screen, but the logic inside
-        // loadChatMessages will handle using the admin's context.
-        this.openChat();
+        // Админ всегда открывает чат как Санта (пишет получателю)
+        this.openChat('recipient');
     }
 
     // --- Логика Пользователя ---
@@ -404,7 +405,7 @@ class SecretSantaApp {
 
         document.getElementById('recipientWaiting').classList.add('hidden');
         document.getElementById('recipientRevealed').classList.remove('hidden');
-        document.getElementById('chatButtonContainer').style.display = 'block';
+        document.getElementById('chatButtonContainer').style.display = 'flex';
 
         // Сброс состояния коробки при входе
         const giftBox = document.getElementById('revealGiftBox');
@@ -434,27 +435,62 @@ class SecretSantaApp {
 
     // --- Чат ---
 
-    async openChat() {
+    async openChat(mode) {
+        this.chatMode = mode; // Запоминаем режим
         this.showScreen('chatScreen');
+
+        // Меняем заголовок чата для ясности
+        const headerTitle = document.querySelector('.chat-header h2');
+        const headerSubtitle = document.querySelector('#chatMessages p'); // Текст-подсказка внутри чата
+
+        if (this.chatMode === 'recipient') {
+            headerTitle.textContent = '🎁 Чат с Подопечным';
+            if(headerSubtitle) headerSubtitle.textContent = 'Вы — Тайный Санта. Не раскрывайте себя!';
+        } else {
+            headerTitle.textContent = '🎅 Чат с Сантой';
+            if(headerSubtitle) headerSubtitle.textContent = 'Здесь можно намекнуть Санте, что вы хотите.';
+        }
+
         await this.loadChatMessages();
     }
 
     async loadChatMessages() {
-        const myPair = this.pairs.find(p => p.santa_id === this.currentUser.id); // Я дарю
+        // Получаем обе пары, где участвует текущий пользователь
+        const myPair = this.pairs.find(p => p.santa_id === this.currentUser.id);     // Я дарю
         const santaPair = this.pairs.find(p => p.receiver_id === this.currentUser.id); // Мне дарят
 
-        if (!myPair && !santaPair) return;
+        let partnerId = null;
 
-        const partnerId = myPair ? myPair.receiver_id : santaPair.santa_id;
+        // Определяем ID собеседника в зависимости от режима
+        if (this.chatMode === 'recipient') {
+            // Режим: Я пишу тому, кому дарю
+            if (myPair) partnerId = myPair.receiver_id;
+        } else {
+            // Режим: Я пишу своему Санте
+            if (santaPair) partnerId = santaPair.santa_id;
+        }
 
-        // Загружаем сообщения между мной и партнером
+        if (!partnerId) {
+            console.log("Партнер не найден для режима:", this.chatMode);
+            // Если партнеров нет (еще нет жеребьевки или ошибка), просто не грузим сообщения
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+            const empty = document.createElement('div');
+            empty.style.textAlign = 'center';
+            empty.style.marginTop = '20px';
+            empty.textContent = 'Чат недоступен.';
+            container.appendChild(empty);
+            return;
+        }
+
+        // Загружаем сообщения
         const { data } = await supabase
             .from('messages')
             .select('*')
             .or(`sender_id.eq.${this.currentUser.id},receiver_id.eq.${this.currentUser.id}`)
             .order('created_at', { ascending: true });
 
-        // Фильтруем (Supabase OR немного сложен, проще отфильтровать лишнее в JS для простоты)
+        // Фильтруем сообщения только с выбранным партнером
         const relevant = data.filter(m =>
             (m.sender_id === this.currentUser.id && m.receiver_id === partnerId) ||
             (m.sender_id === partnerId && m.receiver_id === this.currentUser.id)
@@ -465,10 +501,25 @@ class SecretSantaApp {
 
     renderMessages(messages) {
         const container = document.getElementById('chatMessages');
+        // Очищаем, но сохраняем заголовок-подсказку, если хотим (или просто перерисовываем всё)
         container.innerHTML = '';
 
-        if (messages.length === 0) {
-            container.innerHTML = '<div style="text-align:center;color:#bdc3c7;padding:20px;">Напишите первое сообщение!</div>';
+        // Добавляем подсказку заново
+        const tip = document.createElement('div');
+        tip.style.textAlign = 'center';
+        tip.style.color = '#bdc3c7';
+        tip.style.padding = '20px';
+        tip.innerHTML = this.chatMode === 'recipient'
+            ? '<p>Чат с вашим подопечным. Вы — Санта.</p>'
+            : '<p>Чат с вашим Сантой. Он увидит это сообщение.</p>';
+        container.appendChild(tip);
+
+        if (!messages || messages.length === 0) {
+            const empty = document.createElement('div');
+            empty.style.textAlign = 'center';
+            empty.style.marginTop = '20px';
+            empty.textContent = 'Сообщений пока нет...';
+            container.appendChild(empty);
             return;
         }
 
@@ -477,9 +528,16 @@ class SecretSantaApp {
             const div = document.createElement('div');
             div.className = `message ${isSent ? 'sent' : 'received'}`;
 
-            // Если я отправитель - "Вы", если нет - "Тайный Санта" (или Подопечный)
-            // Упростим: Если я Санта, то мой собеседник "Подопечный". Если я Подопечный, собеседник "Санта".
-            let senderName = isSent ? 'Вы' : 'Собеседник';
+            // Логика имен:
+            // Если isSent (это я): Я всегда "Вы".
+            // Если !isSent (собеседник):
+            //    - В режиме 'recipient' собеседник — это "Подопечный".
+            //    - В режиме 'santa' собеседник — это "Тайный Санта".
+
+            let senderName = 'Вы';
+            if (!isSent) {
+                senderName = this.chatMode === 'recipient' ? 'Подопечный' : 'Тайный Санта';
+            }
 
             const time = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
@@ -500,17 +558,20 @@ class SecretSantaApp {
         const text = input.value.trim();
         if (!text) return;
 
-        // Определяем получателя
+        // Определяем получателя заново, так же как в loadChatMessages
         const myPair = this.pairs.find(p => p.santa_id === this.currentUser.id);
         const santaPair = this.pairs.find(p => p.receiver_id === this.currentUser.id);
 
-        // В этой простой версии чат только с подопечным (как в оригинале кода)
-        // Но логично разрешить общение в обе стороны.
-        // Для простоты берем того, кто назначен (оригинальная логика была "Чат с подопечным")
-        const receiverId = myPair ? myPair.receiver_id : (santaPair ? santaPair.santa_id : null);
+        let receiverId = null;
+
+        if (this.chatMode === 'recipient') {
+             if (myPair) receiverId = myPair.receiver_id;
+        } else {
+             if (santaPair) receiverId = santaPair.santa_id;
+        }
 
         if (!receiverId) {
-            this.showToast('Некому писать!');
+            this.showToast('Ошибка: Некому писать!');
             return;
         }
 
@@ -521,7 +582,6 @@ class SecretSantaApp {
         });
 
         input.value = '';
-        // Сообщение придет через Realtime, но можно добавить оптимистично
     }
 
     // --- Общие методы ---
@@ -632,7 +692,8 @@ class SecretSantaApp {
         document.getElementById('adminDashboardBtn').addEventListener('click', () => this.showAdminDashboard());
         document.getElementById('saveWishlistBtn').addEventListener('click', () => this.saveWishlist());
         document.getElementById('revealGiftBox').addEventListener('click', () => this.revealRecipient());
-        document.getElementById('openChatBtn').addEventListener('click', () => this.openChat());
+        document.getElementById('openRecipientChatBtn').addEventListener('click', () => this.openChat('recipient'));
+        document.getElementById('openSantaChatBtn').addEventListener('click', () => this.openChat('santa'));
         document.getElementById('userLogoutBtn').addEventListener('click', () => this.logout());
         document.getElementById('profileLogoutBtn').addEventListener('click', () => this.logout());
 
